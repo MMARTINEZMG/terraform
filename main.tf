@@ -1,4 +1,4 @@
-# Tabla DynamoDB
+# Tabla DynamoDB para Formulario
 resource "aws_dynamodb_table" "support_table" {
   name           = "SupportTable"
   billing_mode   = "PAY_PER_REQUEST"
@@ -6,6 +6,18 @@ resource "aws_dynamodb_table" "support_table" {
 
   attribute {
     name = "id"
+    type = "S"
+  }
+}
+
+# Tabla DynamoDB para Usuarios
+resource "aws_dynamodb_table" "users_table" {
+  name           = "UsersTable"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "email"
+
+  attribute {
+    name = "email"
     type = "S"
   }
 }
@@ -28,7 +40,7 @@ resource "aws_iam_role" "lambda_role" {
   })
 }
 
-# Política de permisos para DynamoDB y logs
+# Actualización de la política de permisos de IAM para incluir la tabla de usuarios
 resource "aws_iam_role_policy" "lambda_dynamodb_policy" {
   name = "lambda_dynamodb_policy"
   role = aws_iam_role.lambda_role.id
@@ -40,9 +52,13 @@ resource "aws_iam_role_policy" "lambda_dynamodb_policy" {
         Effect = "Allow"
         Action = [
           "dynamodb:PutItem",
+          "dynamodb:GetItem",
           "dynamodb:Scan"
         ]
-        Resource = aws_dynamodb_table.support_table.arn
+        Resource = [
+          aws_dynamodb_table.support_table.arn,
+          aws_dynamodb_table.users_table.arn
+        ]
       },
       {
         Effect = "Allow"
@@ -57,18 +73,19 @@ resource "aws_iam_role_policy" "lambda_dynamodb_policy" {
   })
 }
 
-# Función Lambda
+# Actualización de la función Lambda para usar las dos tablas
 resource "aws_lambda_function" "support_lambda" {
   filename         = "lambda_function.zip"
   function_name    = "support-handler"
   role             = aws_iam_role.lambda_role.arn
   handler          = "index.handler"
-  runtime          = "nodejs18.x"
+  runtime          = "nodejs20.x"
   source_code_hash = filebase64sha256("lambda_function.zip")
 
   environment {
     variables = {
       DYNAMODB_TABLE = aws_dynamodb_table.support_table.name
+      USERS_TABLE    = aws_dynamodb_table.users_table.name
     }
   }
 }
@@ -112,15 +129,21 @@ resource "aws_apigatewayv2_route" "get_supports" {
   target    = "integrations/${aws_apigatewayv2_integration.support_integration.id}"
 }
 
-# Permiso para invocar Lambda
-resource "aws_lambda_permission" "api_gateway_lambda" {
-  statement_id  = "AllowAPIGatewayInvoke"
+# Nueva ruta de API Gateway para Login
+resource "aws_apigatewayv2_route" "login" {
+  api_id    = aws_apigatewayv2_api.support_api.id
+  route_key = "POST /login"
+  target    = "integrations/${aws_apigatewayv2_integration.support_integration.id}"
+}
+
+# Permiso para invocar Lambda desde la ruta Login
+resource "aws_lambda_permission" "api_gateway_login_lambda" {
+  statement_id  = "AllowAPIGatewayInvokeLogin"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.support_lambda.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.support_api.execution_arn}/*"
 }
-
 # Outputs
 output "api_gateway_url" {
   value = aws_apigatewayv2_stage.support_stage.invoke_url
