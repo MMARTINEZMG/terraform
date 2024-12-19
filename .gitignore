@@ -1,0 +1,13 @@
+# .gitignore
+.terraform/
+.terraform.lock.hcl
+tfplan
+
+
+
+*.tfstate
+*.tfstate.backup
+
+*.log
+.DS_Store
+*.swp

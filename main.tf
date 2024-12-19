@@ -1,3 +1,14 @@
+terraform {
+  backend "s3" {
+    bucket         = "mi-terraform-state-bucket-support"
+    key            = "terraform/state.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "terraform-lock-table"
+    encrypt        = true
+  }
+}
+
+
 # Tabla DynamoDB para Formulario
 resource "aws_dynamodb_table" "support_table" {
   name         = "SupportTable"
@@ -144,6 +155,55 @@ resource "aws_lambda_permission" "api_gateway_login_lambda" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.support_api.execution_arn}/*"
 }
+
+# SNS Topic
+resource "aws_sns_topic" "monitoring_topic" {
+  name = "lambda-monitoring-topic"
+}
+
+# SNS Email Subscription
+resource "aws_sns_topic_subscription" "email_subscription" {
+  topic_arn = aws_sns_topic.monitoring_topic.arn
+  protocol  = "email"
+  endpoint  = "garcia.miguelangel1206@gmail.com"
+}
+
+resource "aws_cloudwatch_metric_alarm" "high_request_alarm" {
+  alarm_name          = "HighRequestsAlarm"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Invocations"
+  namespace           = "AWS/Lambda"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 1000
+
+  dimensions = {
+    FunctionName = aws_lambda_function.support_lambda.function_name
+  }
+
+  alarm_actions = [aws_sns_topic.monitoring_topic.arn]
+}
+
+# CloudWatch Alarma para errores en Lambda
+resource "aws_cloudwatch_metric_alarm" "error_alarm" {
+  alarm_name          = "LambdaErrorAlarm"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Errors"
+  namespace           = "AWS/Lambda"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 1
+
+  dimensions = {
+    FunctionName = aws_lambda_function.support_lambda.function_name
+  }
+
+  alarm_actions = [aws_sns_topic.monitoring_topic.arn]
+}
+
+
 # Outputs
 output "api_gateway_url" {
   value = aws_apigatewayv2_stage.support_stage.invoke_url
