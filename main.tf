@@ -176,7 +176,7 @@ resource "aws_cloudwatch_metric_alarm" "high_request_alarm" {
   namespace           = "AWS/Lambda"
   period              = 60
   statistic           = "Sum"
-  threshold           = 1000
+  threshold           = 100
 
   dimensions = {
     FunctionName = aws_lambda_function.support_lambda.function_name
