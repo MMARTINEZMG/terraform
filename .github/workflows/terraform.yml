@@ -27,7 +27,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.5.0 # Cambia a la versión que usas
+          terraform_version: 1.5.0
 
       - name: Initialize Terraform
         run: terraform init -backend-config="bucket=mi-terraform-state-bucket-support" -backend-config="key=terraform/state.tfstate" -backend-config="region=us-east-1"
@@ -43,5 +43,5 @@ jobs:
 
       - name: Apply Terraform plan
         if: github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve tfplan
+        run: terraform destroy -auto-approve tfplan
 
