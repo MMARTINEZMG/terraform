@@ -1,16 +1,14 @@
-name: Deploy Infrastructure with Terraform on AWS
+name: Destroy Infrastructure with Terraform on AWS
 
 on:
+  workflow_dispatch: # Puedes usar esto para iniciar manualmente la destrucción
   push:
-    branches:
-      - main
-  pull_request:
     branches:
       - main
 
 jobs:
   terraform:
-    name: Terraform Deployment
+    name: Terraform Destroy
     runs-on: ubuntu-latest
 
     steps:
@@ -35,13 +33,8 @@ jobs:
       - name: Validate Terraform files
         run: terraform validate
 
-      - name: Check Terraform format
-        run: terraform fmt -check
-
-      - name: Generate Terraform plan
-        run: terraform plan -out=tfplan
-
-      - name: Apply Terraform plan
+      - name: Destroy Terraform resources
         if: github.ref == 'refs/heads/main'
-        run: terraform destroy -auto-approve tfplan
+        run: terraform destroy -auto-approve
+
 
